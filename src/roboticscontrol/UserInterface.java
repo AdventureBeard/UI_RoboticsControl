@@ -5,6 +5,14 @@
  */
 package roboticscontrol;
 
+import java.awt.Color;
+import java.io.File;
+import java.util.Date;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
+import javax.swing.text.Caret;
+import javax.swing.text.DefaultCaret;
+
 /**
  *
  * @author braden
@@ -33,6 +41,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 				parseMessage(message);
 			}
 		}
+		
 	}
 	
 	private void parseMessage(String m) {
@@ -42,26 +51,63 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		switch(command) {
 			case "updateTemp":			updateTemp(parameter);
 										break;
-//			case "updateSpeed":			updateSpeed(parameter);
-//										break;
-//			case "updateClawStatus":	updateClawStatus(parameter);
-//										break;
+			case "updateSpeed":			updateSpeed(parameter);
+										break;
+			case "updateClawStatus":	updateClawStatus(parameter);
+										break;
 //			case "updateX":				updateX(parameter);
 //										break;
 //			case "updateY":				updateY(parameter);
 //										break;
 			default:					break;
 		}
-		
 
-		
+	}
+	
+	private void updateLog(String s) {
+		Date date = new Date();
+		messageLog.append(date + ": " + s + "\n");
+		messageLog.setCaretPosition(messageLog.getText().length());
 	}
 	
 	private void updateTemp(int t) {
-		temperatureLabel.setText(Integer.toString(t));
+		temperatureLabel.setText(Integer.toString(t) + " *F");
+		updateLog("Received new temperature reading from robot");
 	}
 	
+	private void updateSpeed(int s) {
+			
+		if (s == -1) {
+			updateLog("Robot maximum speed reached");
+		} else if (s == -2) {
+			updateLog("Robot is stationary");
+		} else {
+			speed1Label.setBackground(new Color(238,238,238));
+			speed2Label.setBackground(new Color(238,238,238));
+			speed3Label.setBackground(new Color(238,238,238));
+			speed0Label.setBackground(new Color(238,238,238));
+			if (s == 1) {
+				speed1Label.setBackground(Color.red);
+			} else if (s == 2) {
+				speed2Label.setBackground(Color.red);
+			} else if (s == 3) {
+				speed3Label.setBackground(Color.red);
+			} else {
+				speed0Label.setBackground(Color.red);
+			}
+			updateLog("Robot reports speed is " + s );
+		}
+	}
 	
+	private void updateClawStatus(int p) {
+		if (p == 1) {
+			clawButton.setIcon(new ImageIcon("Claw-Closed.png"));
+			updateLog("Robot reports claw is engaged");
+		} else {
+			clawButton.setIcon(new ImageIcon("Claw-Open.png"));
+			updateLog("Robot reports claw is disengaged");
+		}
+	}
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -80,6 +126,10 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         turnRightButton = new javax.swing.JButton();
         stopButton = new javax.swing.JButton();
         speedPanel = new javax.swing.JPanel();
+        speed3Label = new javax.swing.JLabel();
+        speed2Label = new javax.swing.JLabel();
+        speed1Label = new javax.swing.JLabel();
+        speed0Label = new javax.swing.JLabel();
         decSpeedButton = new javax.swing.JButton();
         incSpeedButton = new javax.swing.JButton();
         displayPanel = new javax.swing.JPanel();
@@ -170,15 +220,75 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
         speedPanel.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
 
+        speed3Label.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
+        speed3Label.setForeground(new java.awt.Color(0, 102, 204));
+        speed3Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        speed3Label.setText("▶▶▶");
+        speed3Label.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        speed3Label.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                speed3LabelMousePressed(evt);
+            }
+        });
+
+        speed2Label.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
+        speed2Label.setForeground(new java.awt.Color(0, 204, 204));
+        speed2Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        speed2Label.setText("▶▶");
+        speed2Label.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        speed2Label.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                speed2LabelMousePressed(evt);
+            }
+        });
+
+        speed1Label.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
+        speed1Label.setForeground(new java.awt.Color(153, 204, 255));
+        speed1Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        speed1Label.setText("▶");
+        speed1Label.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        speed1Label.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                speed1LabelMousePressed(evt);
+            }
+        });
+
+        speed0Label.setFont(new java.awt.Font("Lucida Grande", 0, 48)); // NOI18N
+        speed0Label.setForeground(new java.awt.Color(204, 204, 204));
+        speed0Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        speed0Label.setText("-");
+        speed0Label.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        speed0Label.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                speed0LabelMousePressed(evt);
+            }
+        });
+
         javax.swing.GroupLayout speedPanelLayout = new javax.swing.GroupLayout(speedPanel);
         speedPanel.setLayout(speedPanelLayout);
         speedPanelLayout.setHorizontalGroup(
             speedPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
+            .addGroup(speedPanelLayout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(speedPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(speed3Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(speed2Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(speed1Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(speed0Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
         );
         speedPanelLayout.setVerticalGroup(
             speedPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 132, Short.MAX_VALUE)
+            .addGroup(speedPanelLayout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(speed3Label)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(speed2Label, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(speed1Label, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(speed0Label, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         decSpeedButton.setText("Decrease Speed");
@@ -209,7 +319,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                     .addGroup(movementControlsPanelLayout.createSequentialGroup()
                         .addGap(22, 22, 22)
                         .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(stopButton, javax.swing.GroupLayout.DEFAULT_SIZE, 169, Short.MAX_VALUE)
+                            .addComponent(stopButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(speedPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(decSpeedButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(incSpeedButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
@@ -222,13 +332,13 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                 .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(turnLeftButton)
                     .addComponent(turnRightButton))
-                .addGap(23, 23, 23)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(incSpeedButton, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(speedPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(decSpeedButton, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(40, 40, 40)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(stopButton)
                 .addContainerGap())
         );
@@ -239,7 +349,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         gpsDisplayPanel.setLayout(gpsDisplayPanelLayout);
         gpsDisplayPanelLayout.setHorizontalGroup(
             gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 458, Short.MAX_VALUE)
+            .addGap(0, 463, Short.MAX_VALUE)
         );
         gpsDisplayPanelLayout.setVerticalGroup(
             gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -305,6 +415,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
         messageLog.setColumns(20);
         messageLog.setRows(5);
+        messageLog.setBorder(null);
         jScrollPane2.setViewportView(messageLog);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -386,6 +497,22 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         messageService.sendToRobot("turn:0");
     }//GEN-LAST:event_turnLeftButtonMouseReleased
 
+    private void speed3LabelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_speed3LabelMousePressed
+        messageService.sendToRobot("speed2:3");
+    }//GEN-LAST:event_speed3LabelMousePressed
+
+    private void speed2LabelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_speed2LabelMousePressed
+        messageService.sendToRobot("speed2:2");
+    }//GEN-LAST:event_speed2LabelMousePressed
+
+    private void speed1LabelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_speed1LabelMousePressed
+        messageService.sendToRobot("speed2:1");
+    }//GEN-LAST:event_speed1LabelMousePressed
+
+    private void speed0LabelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_speed0LabelMousePressed
+        messageService.sendToRobot("speed2:0");
+    }//GEN-LAST:event_speed0LabelMousePressed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel actuatorControlsPanel;
@@ -400,6 +527,10 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
     private static javax.swing.JTextArea messageLog;
     private javax.swing.JPanel movementControlsPanel;
     private javax.swing.JPanel sensorControlsPanel;
+    private javax.swing.JLabel speed0Label;
+    private javax.swing.JLabel speed1Label;
+    private javax.swing.JLabel speed2Label;
+    private javax.swing.JLabel speed3Label;
     private javax.swing.JPanel speedPanel;
     private javax.swing.JButton stopButton;
     private javax.swing.JLabel temperatureLabel;

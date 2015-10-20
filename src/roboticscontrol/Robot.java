@@ -7,6 +7,7 @@ package roboticscontrol;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Random;
 
 
 /**
@@ -32,6 +33,7 @@ public class Robot implements Runnable {
 		this.running = true;
 		System.out.println("Robot activated!");
 		this.messageService = ms;
+		
 	}
 	
 	public void run() {
@@ -55,6 +57,12 @@ public class Robot implements Runnable {
 			case "turn" :	turn(parameter);
 							break;		
 			case "temp" :	readTemperature();
+							break;
+			case "claw" :	toggleClawEngaged();
+							break;
+			case "speed":	changeSpeed(parameter);
+							break;
+			case "speed2":	setSpeed(parameter);
 							break;
 		}
 	}
@@ -80,21 +88,28 @@ public class Robot implements Runnable {
 	}
 
 	private void setSpeed(int speed) {
-		this.speed = speed;	
+		this.speed = speed;
+		messageService.sendToUI("updateSpeed:" + speed);
 	}
 
 	private void changeSpeed(int increment) {
-		if (increment > 0 && speed < 3) {
-			speed += increment;
-			
+		if (increment > 0 && speed == 3) {
+			messageService.sendToUI("updateSpeed:-1");
+			return;
+		} else if (increment < 0 && speed == 0) {
+			messageService.sendToUI("updateSpeed:-2");
+			return;
+		} else if (increment > 0 && speed < 3) {
+			speed += increment;	
 		} else if (increment < 0 && speed > 0) {
 			speed += increment;
-			
 		}
+		messageService.sendToUI("updateSpeed:" + speed);
 	}
 
 	private void toggleClawEngaged() {
 		clawEngaged = !clawEngaged;
+		messageService.sendToUI("updateClawStatus:" + ((clawEngaged) ? 1 : 0));
 	}
 
 	private void startCamera() {
@@ -102,7 +117,9 @@ public class Robot implements Runnable {
 	}
 
 	private void readTemperature() {
-		messageService.sendToUI("updateTemp:65");
+		Random random = new Random();
+		int temp = random.nextInt((75 - 65) + 1) + 65;
+		messageService.sendToUI("updateTemp:" + temp);
 	}
 
 }
