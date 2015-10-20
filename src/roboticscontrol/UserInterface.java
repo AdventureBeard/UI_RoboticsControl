@@ -6,12 +6,14 @@
 package roboticscontrol;
 
 import java.awt.Color;
-import java.io.File;
+import java.awt.DefaultKeyboardFocusManager;
+import java.awt.KeyEventDispatcher;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
 import java.util.Date;
-import javax.swing.Icon;
 import javax.swing.ImageIcon;
-import javax.swing.text.Caret;
-import javax.swing.text.DefaultCaret;
+import javax.swing.Timer;
 
 /**
  *
@@ -27,42 +29,107 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	
     public UserInterface(MessageService ms) {
 		this.running = true;
-        initComponents();
 		this.messageService = ms;
+        
+		initComponents();
+
 		this.setVisible(true);
+		
+		
+		/** Create a key event dispatcher for a custom global hotkey system.
+		/*	This keeps us from having to add key listeners to every focusable 
+			component in the interface.
+		**/
+		KeyEventDispatcher dispatcher = (KeyEvent event) -> {
+			String[] s = event.paramString().split(",");
+			String eventType = s[0];
+			int keyCode = Integer.parseInt(s[1].substring(s[1].indexOf("=") + 1));
+			handleGlobalKeyboardEvent(eventType, keyCode);
+			return true;
+		};
+		
+		DefaultKeyboardFocusManager.getCurrentKeyboardFocusManager().
+				addKeyEventDispatcher(dispatcher);
     }
 	
+	@Override
 	public void run() {
 		System.out.println("Interface is running.");
+		messageService.sendToRobot("handshake:0");
+
 		while (running) {
 			String message = messageService.receiveFromRobot();
 			if (message != null) {
 				System.out.println("UI: Received a message: " + message);
 				parseMessage(message);
 			}
+			
+			Timer t = new Timer(1000, (ActionEvent e) -> {
+				messageService.sendToRobot("gps:0");
+			});
 		}
-		
 	}
+	
+	private void handleGlobalKeyboardEvent(String eventType, int keyCode) {
+		System.out.println(keyCode);
+		
+		if ("KEY_PRESSED".equals(eventType) && keyCode == 65) {
+			messageService.sendToRobot("turn:-1");
+			turnLeftButton.doClick();
+			
+		} else if ("KEY_RELEASED".equals(eventType) && keyCode == 65) {
+			messageService.sendToRobot("turn:0");
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 68) {
+			messageService.sendToRobot("turn:1");
+			turnRightButton.doClick();
+			
+		} else if ("KEY_RELEASED".equals(eventType) && keyCode == 68) {
+			messageService.sendToRobot("turn:0");
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 87) {
+			messageService.sendToRobot("speed:1");
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 83) {
+			messageService.sendToRobot("speed:-1");
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 32) {
+			messageService.sendToRobot("claw:0");
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 84) {
+			messageService.sendToRobot("temp:0");
+			thermoButton.doClick();
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 67) {
+			messageService.sendToRobot("camera:0");
+			cameraButton.doClick();
+			
+		} else if ("KEY_PRESSED".equals(eventType) && keyCode == 88) {
+			messageService.sendToRobot("speed2:0");
+			stopButton.doClick();
+		}
+	} 
 	
 	private void parseMessage(String m) {
 		String[] message = m.split(":");
 		String command = message[0];
-		int parameter = Integer.parseInt(message[1]);
+		String parameter = message[1];
 		switch(command) {
+			case "handshake":			updateLog("HANDSHAKE SUCCESS: CONNECTION TO ROBOT ESTABLISHED");
+										break;
 			case "updateTemp":			updateTemp(parameter);
 										break;
 			case "updateSpeed":			updateSpeed(parameter);
 										break;
 			case "updateClawStatus":	updateClawStatus(parameter);
 										break;
-//			case "updateX":				updateX(parameter);
-//										break;
-//			case "updateY":				updateY(parameter);
-//										break;
+			case "gps":					updateGPS(parameter);
+										break;
 			default:					break;
 		}
-
 	}
+	
+	
 	
 	private void updateLog(String s) {
 		Date date = new Date();
@@ -70,13 +137,21 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		messageLog.setCaretPosition(messageLog.getText().length());
 	}
 	
-	private void updateTemp(int t) {
-		temperatureLabel.setText(Integer.toString(t) + " *F");
-		updateLog("Received new temperature reading from robot");
+	private void updateGPS(String p) {
+		String[] args = p.split("-");
+		xCoordinateValue.setText(args[0]);
+		yCoordinateValue.setText(args[1]);
+		headingValue.setText(args[2]);
+		
 	}
 	
-	private void updateSpeed(int s) {
-			
+	private void updateTemp(String t) {
+		temperatureLabel.setText(t + " °F");
+		updateLog("Received new temperature reading from robot: " + t + " °F" );
+	}
+	
+	private void updateSpeed(String speed) {
+		int s = Integer.parseInt(speed);
 		if (s == -1) {
 			updateLog("Robot maximum speed reached");
 		} else if (s == -2) {
@@ -95,17 +170,18 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 			} else {
 				speed0Label.setBackground(Color.red);
 			}
-			updateLog("Robot reports speed is " + s );
+			updateLog("Robot set speed to " + s );
 		}
 	}
 	
-	private void updateClawStatus(int p) {
-		if (p == 1) {
+	private void updateClawStatus(String status) {
+		int s = Integer.parseInt(status);
+		if (s == 1) {
 			clawButton.setIcon(new ImageIcon("Claw-Closed.png"));
-			updateLog("Robot reports claw is engaged");
+			updateLog("Robot set claw to engaged");
 		} else {
 			clawButton.setIcon(new ImageIcon("Claw-Open.png"));
-			updateLog("Robot reports claw is disengaged");
+			updateLog("Robot set claw to disengaged");
 		}
 	}
 
@@ -134,6 +210,13 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         incSpeedButton = new javax.swing.JButton();
         displayPanel = new javax.swing.JPanel();
         gpsDisplayPanel = new javax.swing.JPanel();
+        jPanel1 = new javax.swing.JPanel();
+        yCoordinateLabel = new javax.swing.JLabel();
+        xCoordinateLabel = new javax.swing.JLabel();
+        headingLabel = new javax.swing.JLabel();
+        xCoordinateValue = new javax.swing.JLabel();
+        yCoordinateValue = new javax.swing.JLabel();
+        headingValue = new javax.swing.JLabel();
         sensorControlsPanel = new javax.swing.JPanel();
         cameraButton = new javax.swing.JButton();
         thermoButton = new javax.swing.JButton();
@@ -190,6 +273,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         movementControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Movement Controls"));
 
         turnLeftButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/ArrowLeft.png"))); // NOI18N
+        turnLeftButton.setBorderPainted(false);
         turnLeftButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 turnLeftButtonMousePressed(evt);
@@ -200,12 +284,18 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         });
 
         turnRightButton.setIcon(new javax.swing.ImageIcon("/Users/braden/Documents/ArrowRight.png")); // NOI18N
+        turnRightButton.setBorderPainted(false);
         turnRightButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 turnRightButtonMousePressed(evt);
             }
             public void mouseReleased(java.awt.event.MouseEvent evt) {
                 turnRightButtonMouseReleased(evt);
+            }
+        });
+        turnRightButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                turnRightButtonActionPerformed(evt);
             }
         });
 
@@ -320,9 +410,11 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                         .addGap(22, 22, 22)
                         .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addComponent(stopButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(speedPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(decSpeedButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(incSpeedButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                            .addComponent(incSpeedButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addGroup(movementControlsPanelLayout.createSequentialGroup()
+                                .addGap(24, 24, 24)
+                                .addComponent(speedPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))))
                 .addContainerGap(29, Short.MAX_VALUE))
         );
         movementControlsPanelLayout.setVerticalGroup(
@@ -343,17 +435,70 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                 .addContainerGap())
         );
 
-        gpsDisplayPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Display"));
+        gpsDisplayPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Map"));
+
+        jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Details"));
+
+        yCoordinateLabel.setText("Y Coordinate:");
+
+        xCoordinateLabel.setText("X Coordinate:");
+
+        headingLabel.setText("Heading: ");
+
+        xCoordinateValue.setText("0");
+
+        yCoordinateValue.setText("0");
+
+        headingValue.setText("0");
+
+        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
+        jPanel1.setLayout(jPanel1Layout);
+        jPanel1Layout.setHorizontalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addGap(10, 10, 10)
+                .addComponent(xCoordinateLabel)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(xCoordinateValue)
+                .addGap(69, 69, 69)
+                .addComponent(yCoordinateLabel)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(yCoordinateValue)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 76, Short.MAX_VALUE)
+                .addComponent(headingLabel)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(headingValue)
+                .addGap(21, 21, 21))
+        );
+        jPanel1Layout.setVerticalGroup(
+            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel1Layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(xCoordinateLabel)
+                    .addComponent(yCoordinateLabel)
+                    .addComponent(headingLabel)
+                    .addComponent(xCoordinateValue)
+                    .addComponent(yCoordinateValue)
+                    .addComponent(headingValue))
+                .addGap(11, 11, 11))
+        );
 
         javax.swing.GroupLayout gpsDisplayPanelLayout = new javax.swing.GroupLayout(gpsDisplayPanel);
         gpsDisplayPanel.setLayout(gpsDisplayPanelLayout);
         gpsDisplayPanelLayout.setHorizontalGroup(
             gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 463, Short.MAX_VALUE)
+            .addGroup(gpsDisplayPanelLayout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
         );
         gpsDisplayPanelLayout.setVerticalGroup(
             gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 0, Short.MAX_VALUE)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, gpsDisplayPanelLayout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap())
         );
 
         javax.swing.GroupLayout displayPanelLayout = new javax.swing.GroupLayout(displayPanel);
@@ -422,9 +567,9 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+            .addGroup(layout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jScrollPane2)
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(movementControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -474,7 +619,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         }//GEN-LAST:event_decSpeedButtonMousePressed
 
         private void stopButtonMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_stopButtonMousePressed
-			messageService.sendToRobot("stop:0");
+			messageService.sendToRobot("speed2:0");
         }//GEN-LAST:event_stopButtonMousePressed
 
         private void clawButtonMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_clawButtonMousePressed
@@ -513,6 +658,10 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         messageService.sendToRobot("speed2:0");
     }//GEN-LAST:event_speed0LabelMousePressed
 
+    private void turnRightButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_turnRightButtonActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_turnRightButtonActionPerformed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel actuatorControlsPanel;
@@ -522,7 +671,10 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
     private javax.swing.JButton decSpeedButton;
     private javax.swing.JPanel displayPanel;
     private javax.swing.JPanel gpsDisplayPanel;
+    private javax.swing.JLabel headingLabel;
+    private javax.swing.JLabel headingValue;
     private javax.swing.JButton incSpeedButton;
+    private javax.swing.JPanel jPanel1;
     private javax.swing.JScrollPane jScrollPane2;
     private static javax.swing.JTextArea messageLog;
     private javax.swing.JPanel movementControlsPanel;
@@ -537,5 +689,9 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
     private javax.swing.JButton thermoButton;
     private javax.swing.JButton turnLeftButton;
     private javax.swing.JButton turnRightButton;
+    private javax.swing.JLabel xCoordinateLabel;
+    private javax.swing.JLabel xCoordinateValue;
+    private javax.swing.JLabel yCoordinateLabel;
+    private javax.swing.JLabel yCoordinateValue;
     // End of variables declaration//GEN-END:variables
 }
