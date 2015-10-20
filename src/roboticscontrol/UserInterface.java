@@ -38,8 +38,7 @@ public class UserInterface extends javax.swing.JFrame {
                 jButton7 = new javax.swing.JButton();
                 jButton8 = new javax.swing.JButton();
                 displayPanel = new javax.swing.JPanel();
-                jScrollPane1 = new javax.swing.JScrollPane();
-                jTextArea2 = new javax.swing.JTextArea();
+                jPanel3 = new javax.swing.JPanel();
                 sensorControlsPanel = new javax.swing.JPanel();
                 jButton5 = new javax.swing.JButton();
                 jButton6 = new javax.swing.JButton();
@@ -52,7 +51,7 @@ public class UserInterface extends javax.swing.JFrame {
 
                 actuatorControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Actuator Controls"));
 
-                jButton4.setText("Toggle Claw");
+                jButton4.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/Claw-Open.png"))); // NOI18N
                 jButton4.addActionListener(new java.awt.event.ActionListener() {
                         public void actionPerformed(java.awt.event.ActionEvent evt) {
                                 jButton4ActionPerformed(evt);
@@ -65,7 +64,7 @@ public class UserInterface extends javax.swing.JFrame {
                 jPanel1.setLayout(jPanel1Layout);
                 jPanel1Layout.setHorizontalGroup(
                         jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addGap(0, 233, Short.MAX_VALUE)
                 );
                 jPanel1Layout.setVerticalGroup(
                         jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -76,14 +75,14 @@ public class UserInterface extends javax.swing.JFrame {
                 actuatorControlsPanel.setLayout(actuatorControlsPanelLayout);
                 actuatorControlsPanelLayout.setHorizontalGroup(
                         actuatorControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, actuatorControlsPanelLayout.createSequentialGroup()
-                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(jButton4)
-                                .addGap(65, 65, 65))
                         .addGroup(actuatorControlsPanelLayout.createSequentialGroup()
                                 .addContainerGap()
                                 .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addContainerGap())
+                        .addGroup(actuatorControlsPanelLayout.createSequentialGroup()
+                                .addGap(70, 70, 70)
+                                .addComponent(jButton4)
+                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 );
                 actuatorControlsPanelLayout.setVerticalGroup(
                         actuatorControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -96,9 +95,14 @@ public class UserInterface extends javax.swing.JFrame {
 
                 movementControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Movement Controls"));
 
-                jButton1.setText("Left");
+                jButton1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/ArrowLeft.png"))); // NOI18N
+                jButton1.addActionListener(new java.awt.event.ActionListener() {
+                        public void actionPerformed(java.awt.event.ActionEvent evt) {
+                                jButton1ActionPerformed(evt);
+                        }
+                });
 
-                jButton2.setText("Right");
+                jButton2.setIcon(new javax.swing.ImageIcon("/Users/braden/Documents/ArrowRight.png")); // NOI18N
 
                 jButton3.setBackground(new java.awt.Color(255, 102, 102));
                 jButton3.setFont(new java.awt.Font("Lucida Grande", 0, 48)); // NOI18N
@@ -114,7 +118,7 @@ public class UserInterface extends javax.swing.JFrame {
                 );
                 jPanel2Layout.setVerticalGroup(
                         jPanel2Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGap(0, 102, Short.MAX_VALUE)
+                        .addGap(0, 132, Short.MAX_VALUE)
                 );
 
                 jButton7.setText("Decrease Speed");
@@ -127,10 +131,10 @@ public class UserInterface extends javax.swing.JFrame {
                         movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGroup(movementControlsPanelLayout.createSequentialGroup()
                                 .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                        .addGroup(movementControlsPanelLayout.createSequentialGroup()
+                                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, movementControlsPanelLayout.createSequentialGroup()
                                                 .addContainerGap()
-                                                .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                                .addComponent(jButton1)
+                                                .addGap(18, 18, 18)
                                                 .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE))
                                         .addGroup(movementControlsPanelLayout.createSequentialGroup()
                                                 .addGap(22, 22, 22)
@@ -138,46 +142,49 @@ public class UserInterface extends javax.swing.JFrame {
                                                         .addComponent(jButton3, javax.swing.GroupLayout.DEFAULT_SIZE, 169, Short.MAX_VALUE)
                                                         .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                                         .addComponent(jButton7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                                        .addComponent(jButton8, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                                                .addGap(0, 23, Short.MAX_VALUE)))
-                                .addContainerGap())
+                                                        .addComponent(jButton8, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                                .addContainerGap(29, Short.MAX_VALUE))
                 );
                 movementControlsPanelLayout.setVerticalGroup(
                         movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGroup(movementControlsPanelLayout.createSequentialGroup()
-                                .addGap(35, 35, 35)
+                                .addContainerGap()
                                 .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                                         .addComponent(jButton1)
                                         .addComponent(jButton2))
-                                .addGap(36, 36, 36)
+                                .addGap(23, 23, 23)
                                 .addComponent(jButton8, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jButton7, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(18, 18, 18)
+                                .addGap(40, 40, 40)
                                 .addComponent(jButton3)
                                 .addContainerGap())
                 );
 
-                jTextArea2.setColumns(20);
-                jTextArea2.setRows(5);
-                jScrollPane1.setViewportView(jTextArea2);
+                jPanel3.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Display"));
+
+                javax.swing.GroupLayout jPanel3Layout = new javax.swing.GroupLayout(jPanel3);
+                jPanel3.setLayout(jPanel3Layout);
+                jPanel3Layout.setHorizontalGroup(
+                        jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGap(0, 427, Short.MAX_VALUE)
+                );
+                jPanel3Layout.setVerticalGroup(
+                        jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGap(0, 0, Short.MAX_VALUE)
+                );
 
                 javax.swing.GroupLayout displayPanelLayout = new javax.swing.GroupLayout(displayPanel);
                 displayPanel.setLayout(displayPanelLayout);
                 displayPanelLayout.setHorizontalGroup(
                         displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, displayPanelLayout.createSequentialGroup()
-                                .addGap(0, 0, Short.MAX_VALUE)
-                                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 439, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 );
                 displayPanelLayout.setVerticalGroup(
                         displayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                        .addGroup(displayPanelLayout.createSequentialGroup()
-                                .addContainerGap()
-                                .addComponent(jScrollPane1)
-                                .addContainerGap())
+                        .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 );
 
                 sensorControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Sensor Controls"));
@@ -224,7 +231,7 @@ public class UserInterface extends javax.swing.JFrame {
                                                 .addComponent(jButton6, javax.swing.GroupLayout.DEFAULT_SIZE, 67, Short.MAX_VALUE)
                                                 .addComponent(jLabel2))
                                         .addComponent(jLabel1))
-                                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addContainerGap(12, Short.MAX_VALUE))
                 );
 
                 jTextArea1.setColumns(20);
@@ -253,14 +260,15 @@ public class UserInterface extends javax.swing.JFrame {
                         layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                         .addGroup(layout.createSequentialGroup()
                                 .addContainerGap()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                                         .addComponent(displayPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                         .addGroup(layout.createSequentialGroup()
                                                 .addComponent(actuatorControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                                .addComponent(sensorControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addGap(6, 6, 6))
-                                        .addComponent(movementControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                                .addComponent(sensorControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                        .addGroup(layout.createSequentialGroup()
+                                                .addComponent(movementControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                .addGap(0, 0, Short.MAX_VALUE)))
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                 .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
@@ -276,6 +284,10 @@ public class UserInterface extends javax.swing.JFrame {
         private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton5ActionPerformed
                 // TODO add your handling code here:
         }//GEN-LAST:event_jButton5ActionPerformed
+
+        private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+                // TODO add your handling code here:
+        }//GEN-LAST:event_jButton1ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -327,10 +339,9 @@ public class UserInterface extends javax.swing.JFrame {
         private javax.swing.JLabel jLabel2;
         private javax.swing.JPanel jPanel1;
         private javax.swing.JPanel jPanel2;
-        private javax.swing.JScrollPane jScrollPane1;
+        private javax.swing.JPanel jPanel3;
         private javax.swing.JScrollPane jScrollPane2;
         private javax.swing.JTextArea jTextArea1;
-        private javax.swing.JTextArea jTextArea2;
         private javax.swing.JPanel movementControlsPanel;
         private javax.swing.JPanel sensorControlsPanel;
         // End of variables declaration//GEN-END:variables
