@@ -6,13 +6,24 @@
 package roboticscontrol;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.DefaultKeyboardFocusManager;
+import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.KeyEventDispatcher;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
+import javax.swing.JLabel;
 import javax.swing.Timer;
 
 /**
@@ -26,15 +37,21 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	
 	MessageService messageService;
 	private boolean running;
+	BufferedImage image; 
 	
     public UserInterface(MessageService ms) {
 		this.running = true;
 		this.messageService = ms;
-        
+		try {
+			this.image = ImageIO.read(new File("robot.png"));
+		} catch (IOException ex) {
+			Logger.getLogger(UserInterface.class.getName()).log(Level.SEVERE, null, ex);
+		}
+		
 		initComponents();
 
+		mapPanel.setLayout(null);
 		this.setVisible(true);
-		
 		
 		/** Create a key event dispatcher for a custom global hotkey system.
 		/*	This keeps us from having to add key listeners to every focusable 
@@ -50,26 +67,37 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		
 		DefaultKeyboardFocusManager.getCurrentKeyboardFocusManager().
 				addKeyEventDispatcher(dispatcher);
+		
+
     }
 	
 	@Override
 	public void run() {
 		System.out.println("Interface is running.");
 		messageService.sendToRobot("handshake:0");
+		
+		// Setting a separate tick for getting GPS data from the robot.
+		Timer t = new Timer(5, (ActionEvent e) -> {
+			messageService.sendToRobot("gps:0");
+		});
+		t.start();
 
+		// This would benefit from more thread synchronization. This whole program is a CPU hog.
 		while (running) {
 			String message = messageService.receiveFromRobot();
 			if (message != null) {
-				System.out.println("UI: Received a message: " + message);
 				parseMessage(message);
 			}
-			
-			Timer t = new Timer(1000, (ActionEvent e) -> {
-				messageService.sendToRobot("gps:0");
-			});
 		}
 	}
 	
+	/** handleGlobalKeyboardEvent
+	 * 
+	 * 	Event handler for global keyboard shortcuts for robot functions.
+	 * 
+	 * @param eventType 	The type of event, such as "KEY_PRESSED" or "KEY_RELEASED"
+	 * @param keyCode 		The code of the pressed key
+	 */
 	private void handleGlobalKeyboardEvent(String eventType, int keyCode) {
 		System.out.println(keyCode);
 		
@@ -110,6 +138,14 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		}
 	} 
 	
+
+	/** parseMessage
+	 *	
+	 * 	Method for converting a message from the robot into some action to modify
+	 *  the UI state.
+	 * 
+	 * @param m  a String containing an instruction in the format 'command:parameter'
+	 */
 	private void parseMessage(String m) {
 		String[] message = m.split(":");
 		String command = message[0];
@@ -125,12 +161,19 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 										break;
 			case "gps":					updateGPS(parameter);
 										break;
+			case "bounds":				updateLog("Robot reached bounds of operation area.");
+										break;
 			default:					break;
 		}
 	}
 	
 	
-	
+	/** updateLog
+	 * 
+	 * Report messages from robot to the interface.
+	 * 
+	 * @param s 	a String to be appended to the messageLog text area.
+	 */
 	private void updateLog(String s) {
 		Date date = new Date();
 		messageLog.append(date + ": " + s + "\n");
@@ -139,10 +182,24 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	
 	private void updateGPS(String p) {
 		String[] args = p.split("-");
-		xCoordinateValue.setText(args[0]);
-		yCoordinateValue.setText(args[1]);
-		headingValue.setText(args[2]);
-		
+		double x = Double.parseDouble(args[0]);
+		double y = Double.parseDouble(args[1]);
+
+		double heading = Math.atan(y/x);
+		heading = heading * (180 / Math.PI);
+
+		int posX = (int) Math.round(x);
+		int posY = (int) Math.round(y);
+		int displayHeading = (int) Math.round(heading);
+
+		xCoordinateValue.setText(String.valueOf(posX));
+		yCoordinateValue.setText(String.valueOf(posY));
+		headingValue.setText(String.valueOf(displayHeading));
+
+		BufferedImage rotated = setAngle(image, heading);
+		ImageIcon ic = new ImageIcon(rotated);
+		robot.setIcon(ic);
+		robot.setLocation(posX, posY);
 	}
 	
 	private void updateTemp(String t) {
@@ -152,26 +209,24 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	
 	private void updateSpeed(String speed) {
 		int s = Integer.parseInt(speed);
-		if (s == -1) {
-			updateLog("Robot maximum speed reached");
-		} else if (s == -2) {
-			updateLog("Robot is stationary");
-		} else {
-			speed1Label.setBackground(new Color(238,238,238));
-			speed2Label.setBackground(new Color(238,238,238));
-			speed3Label.setBackground(new Color(238,238,238));
-			speed0Label.setBackground(new Color(238,238,238));
-			if (s == 1) {
-				speed1Label.setBackground(Color.red);
-			} else if (s == 2) {
-				speed2Label.setBackground(Color.red);
-			} else if (s == 3) {
-				speed3Label.setBackground(Color.red);
-			} else {
-				speed0Label.setBackground(Color.red);
-			}
-			updateLog("Robot set speed to " + s );
+		speed1Label.setBackground(new Color(238,238,238));
+		speed2Label.setBackground(new Color(238,238,238));
+		speed3Label.setBackground(new Color(238,238,238));
+		speed0Label.setBackground(new Color(238,238,238));
+		speedRevLabel.setBackground(new Color(238,238,238));
+
+		if (s == 1) {
+			speed1Label.setBackground(Color.red);
+		} else if (s == 2) {
+			speed2Label.setBackground(Color.red);
+		} else if (s == 3) {
+			speed3Label.setBackground(Color.red);
+		} else if (s == -1) {
+			speedRevLabel.setBackground(Color.red);
+		} else if (s == 0) {
+			speed0Label.setBackground(Color.red);
 		}
+		updateLog("Robot set speed to " + s );
 	}
 	
 	private void updateClawStatus(String status) {
@@ -184,6 +239,22 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 			updateLog("Robot set claw to disengaged");
 		}
 	}
+
+	private BufferedImage setAngle(BufferedImage image, double angle) {
+		int locX = image.getWidth() / 2;
+		int locY = image.getHeight() / 2;
+		
+		AffineTransform transform = new AffineTransform();
+
+		transform.translate(locX, locY);
+		transform.rotate(angle);
+		transform.translate(-locX, -locY/2);
+   		AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
+        	
+		image = op.filter(image, null);
+		return image;
+	}
+	
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -206,17 +277,20 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         speed2Label = new javax.swing.JLabel();
         speed1Label = new javax.swing.JLabel();
         speed0Label = new javax.swing.JLabel();
+        speedRevLabel = new javax.swing.JLabel();
         decSpeedButton = new javax.swing.JButton();
         incSpeedButton = new javax.swing.JButton();
         displayPanel = new javax.swing.JPanel();
         gpsDisplayPanel = new javax.swing.JPanel();
-        jPanel1 = new javax.swing.JPanel();
+        gpsDetailsPanel = new javax.swing.JPanel();
         yCoordinateLabel = new javax.swing.JLabel();
         xCoordinateLabel = new javax.swing.JLabel();
         headingLabel = new javax.swing.JLabel();
         xCoordinateValue = new javax.swing.JLabel();
         yCoordinateValue = new javax.swing.JLabel();
         headingValue = new javax.swing.JLabel();
+        mapPanel = new javax.swing.JPanel();
+        robot = new javax.swing.JLabel();
         sensorControlsPanel = new javax.swing.JPanel();
         cameraButton = new javax.swing.JButton();
         thermoButton = new javax.swing.JButton();
@@ -228,20 +302,20 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
         actuatorControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Actuator Controls"));
 
-        clawButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/Claw-Open.png"))); // NOI18N
+        clawButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/res/Claw-Open.png"))); // NOI18N
         clawButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 clawButtonMousePressed(evt);
             }
         });
 
-        armAnglePanel.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
+        armAnglePanel.setBorder(new javax.swing.border.SoftBevelBorder(javax.swing.border.BevelBorder.RAISED));
 
         javax.swing.GroupLayout armAnglePanelLayout = new javax.swing.GroupLayout(armAnglePanel);
         armAnglePanel.setLayout(armAnglePanelLayout);
         armAnglePanelLayout.setHorizontalGroup(
             armAnglePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 233, Short.MAX_VALUE)
+            .addGap(0, 0, Short.MAX_VALUE)
         );
         armAnglePanelLayout.setVerticalGroup(
             armAnglePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -257,7 +331,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                 .addComponent(armAnglePanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addContainerGap())
             .addGroup(actuatorControlsPanelLayout.createSequentialGroup()
-                .addGap(68, 68, 68)
+                .addGap(58, 58, 58)
                 .addComponent(clawButton)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -272,7 +346,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
         movementControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Movement Controls"));
 
-        turnLeftButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/ArrowLeft.png"))); // NOI18N
+        turnLeftButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/res/ArrowLeft.png"))); // NOI18N
         turnLeftButton.setBorderPainted(false);
         turnLeftButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
@@ -283,7 +357,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
             }
         });
 
-        turnRightButton.setIcon(new javax.swing.ImageIcon("/Users/braden/Documents/ArrowRight.png")); // NOI18N
+        turnRightButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/res/ArrowRight.png"))); // NOI18N
         turnRightButton.setBorderPainted(false);
         turnRightButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
@@ -300,7 +374,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         });
 
         stopButton.setBackground(new java.awt.Color(255, 102, 102));
-        stopButton.setFont(new java.awt.Font("Lucida Grande", 0, 48)); // NOI18N
+        stopButton.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
         stopButton.setText("STOP");
         stopButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
@@ -308,9 +382,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
             }
         });
 
-        speedPanel.setBorder(javax.swing.BorderFactory.createLineBorder(new java.awt.Color(0, 0, 0)));
-
-        speed3Label.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
+        speed3Label.setFont(new java.awt.Font("Lucida Grande", 0, 34)); // NOI18N
         speed3Label.setForeground(new java.awt.Color(0, 102, 204));
         speed3Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         speed3Label.setText("▶▶▶");
@@ -321,7 +393,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
             }
         });
 
-        speed2Label.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
+        speed2Label.setFont(new java.awt.Font("Lucida Grande", 0, 34)); // NOI18N
         speed2Label.setForeground(new java.awt.Color(0, 204, 204));
         speed2Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         speed2Label.setText("▶▶");
@@ -332,7 +404,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
             }
         });
 
-        speed1Label.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
+        speed1Label.setFont(new java.awt.Font("Lucida Grande", 0, 34)); // NOI18N
         speed1Label.setForeground(new java.awt.Color(153, 204, 255));
         speed1Label.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         speed1Label.setText("▶");
@@ -354,6 +426,18 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
             }
         });
 
+        speedRevLabel.setFont(new java.awt.Font("Lucida Grande", 0, 24)); // NOI18N
+        speedRevLabel.setForeground(new java.awt.Color(153, 204, 255));
+        speedRevLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        speedRevLabel.setText("REV");
+        speedRevLabel.setToolTipText("");
+        speedRevLabel.setBorder(javax.swing.BorderFactory.createEtchedBorder());
+        speedRevLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mousePressed(java.awt.event.MouseEvent evt) {
+                speedRevLabelMousePressed(evt);
+            }
+        });
+
         javax.swing.GroupLayout speedPanelLayout = new javax.swing.GroupLayout(speedPanel);
         speedPanel.setLayout(speedPanelLayout);
         speedPanelLayout.setHorizontalGroup(
@@ -364,31 +448,34 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                     .addComponent(speed3Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(speed2Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(speed1Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(speed0Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addComponent(speed0Label, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(speedRevLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         speedPanelLayout.setVerticalGroup(
             speedPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(speedPanelLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(speed3Label)
+                .addComponent(speed3Label, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(speed2Label, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(speed2Label, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(speed1Label, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(speed1Label, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(speed0Label, javax.swing.GroupLayout.PREFERRED_SIZE, 47, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(speed0Label, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(speedRevLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 35, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap())
         );
 
-        decSpeedButton.setText("Decrease Speed");
+        decSpeedButton.setText("Decrease Speed (S)");
         decSpeedButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 decSpeedButtonMousePressed(evt);
             }
         });
 
-        incSpeedButton.setText("Increase Speed");
+        incSpeedButton.setText("Increase Speed (W)");
         incSpeedButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 incSpeedButtonMousePressed(evt);
@@ -400,22 +487,21 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         movementControlsPanelLayout.setHorizontalGroup(
             movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(movementControlsPanelLayout.createSequentialGroup()
+                .addGap(16, 16, 16)
                 .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, movementControlsPanelLayout.createSequentialGroup()
-                        .addContainerGap()
+                    .addGroup(movementControlsPanelLayout.createSequentialGroup()
                         .addComponent(turnLeftButton)
                         .addGap(18, 18, 18)
                         .addComponent(turnRightButton, javax.swing.GroupLayout.PREFERRED_SIZE, 76, javax.swing.GroupLayout.PREFERRED_SIZE))
                     .addGroup(movementControlsPanelLayout.createSequentialGroup()
-                        .addGap(22, 22, 22)
-                        .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(stopButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(decSpeedButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(incSpeedButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addGroup(movementControlsPanelLayout.createSequentialGroup()
-                                .addGap(24, 24, 24)
-                                .addComponent(speedPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))))
-                .addContainerGap(29, Short.MAX_VALUE))
+                        .addGap(6, 6, 6)
+                        .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
+                            .addComponent(incSpeedButton, javax.swing.GroupLayout.PREFERRED_SIZE, 149, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                .addComponent(stopButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(decSpeedButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 143, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(speedPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                .addContainerGap(17, Short.MAX_VALUE))
         );
         movementControlsPanelLayout.setVerticalGroup(
             movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -430,14 +516,14 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                 .addComponent(speedPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(decSpeedButton, javax.swing.GroupLayout.PREFERRED_SIZE, 34, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(stopButton)
-                .addContainerGap())
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         gpsDisplayPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Map"));
 
-        jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Details"));
+        gpsDetailsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("GPS Details"));
 
         yCoordinateLabel.setText("Y Coordinate:");
 
@@ -451,30 +537,30 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
         headingValue.setText("0");
 
-        javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
-        jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
+        javax.swing.GroupLayout gpsDetailsPanelLayout = new javax.swing.GroupLayout(gpsDetailsPanel);
+        gpsDetailsPanel.setLayout(gpsDetailsPanelLayout);
+        gpsDetailsPanelLayout.setHorizontalGroup(
+            gpsDetailsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(gpsDetailsPanelLayout.createSequentialGroup()
                 .addGap(10, 10, 10)
                 .addComponent(xCoordinateLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(xCoordinateValue)
-                .addGap(69, 69, 69)
+                .addGap(42, 42, 42)
                 .addComponent(yCoordinateLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(yCoordinateValue)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 76, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 74, Short.MAX_VALUE)
                 .addComponent(headingLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(headingValue)
-                .addGap(21, 21, 21))
+                .addGap(27, 27, 27))
         );
-        jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel1Layout.createSequentialGroup()
+        gpsDetailsPanelLayout.setVerticalGroup(
+            gpsDetailsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(gpsDetailsPanelLayout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addGroup(gpsDetailsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(xCoordinateLabel)
                     .addComponent(yCoordinateLabel)
                     .addComponent(headingLabel)
@@ -484,20 +570,44 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                 .addGap(11, 11, 11))
         );
 
+        mapPanel.setBackground(new java.awt.Color(0, 153, 0));
+
+        robot.setIcon(new javax.swing.ImageIcon(getClass().getResource("/roboticscontrol/res/Robot.png"))); // NOI18N
+
+        javax.swing.GroupLayout mapPanelLayout = new javax.swing.GroupLayout(mapPanel);
+        mapPanel.setLayout(mapPanelLayout);
+        mapPanelLayout.setHorizontalGroup(
+            mapPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, mapPanelLayout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(robot)
+                .addGap(75, 75, 75))
+        );
+        mapPanelLayout.setVerticalGroup(
+            mapPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(mapPanelLayout.createSequentialGroup()
+                .addGap(85, 85, 85)
+                .addComponent(robot)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+
         javax.swing.GroupLayout gpsDisplayPanelLayout = new javax.swing.GroupLayout(gpsDisplayPanel);
         gpsDisplayPanel.setLayout(gpsDisplayPanelLayout);
         gpsDisplayPanelLayout.setHorizontalGroup(
             gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(gpsDisplayPanelLayout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, gpsDisplayPanelLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jPanel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addGroup(gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(mapPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(gpsDetailsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
         gpsDisplayPanelLayout.setVerticalGroup(
             gpsDisplayPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, gpsDisplayPanelLayout.createSequentialGroup()
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jPanel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(mapPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(gpsDetailsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
 
@@ -514,14 +624,19 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
         sensorControlsPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Sensor Controls"));
 
-        cameraButton.setText("Camera");
+        cameraButton.setText("(C)amera");
         cameraButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 cameraButtonMousePressed(evt);
             }
         });
+        cameraButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                cameraButtonActionPerformed(evt);
+            }
+        });
 
-        thermoButton.setText("Thermometer");
+        thermoButton.setText("(T)hermometer");
         thermoButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 thermoButtonMousePressed(evt);
@@ -541,21 +656,21 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                     .addComponent(cameraButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(sensorControlsPanelLayout.createSequentialGroup()
                         .addComponent(thermoButton)
-                        .addGap(17, 17, 17)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(temperatureLabel)
-                        .addGap(0, 29, Short.MAX_VALUE)))
+                        .addGap(0, 0, Short.MAX_VALUE)))
                 .addContainerGap())
         );
         sensorControlsPanelLayout.setVerticalGroup(
             sensorControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(sensorControlsPanelLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(cameraButton, javax.swing.GroupLayout.PREFERRED_SIZE, 69, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(cameraButton, javax.swing.GroupLayout.PREFERRED_SIZE, 108, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(sensorControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(thermoButton, javax.swing.GroupLayout.PREFERRED_SIZE, 67, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(temperatureLabel))
-                .addContainerGap(12, Short.MAX_VALUE))
+                .addContainerGap(8, Short.MAX_VALUE))
         );
 
         messageLog.setColumns(20);
@@ -577,8 +692,9 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                         .addComponent(displayPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(sensorControlsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(actuatorControlsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                            .addComponent(actuatorControlsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(sensorControlsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addGap(3, 3, 3)))
                 .addContainerGap())
         );
         layout.setVerticalGroup(
@@ -589,14 +705,13 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                     .addComponent(displayPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addGroup(layout.createSequentialGroup()
                         .addComponent(actuatorControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addComponent(sensorControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
-                    .addGroup(layout.createSequentialGroup()
-                        .addComponent(movementControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE)))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(sensorControlsPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(0, 0, Short.MAX_VALUE))
+                    .addComponent(movementControlsPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(9, 9, 9))
         );
 
         pack();
@@ -662,6 +777,14 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         // TODO add your handling code here:
     }//GEN-LAST:event_turnRightButtonActionPerformed
 
+    private void cameraButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cameraButtonActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_cameraButtonActionPerformed
+
+    private void speedRevLabelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_speedRevLabelMousePressed
+        messageService.sendToRobot("speed2:-1");
+    }//GEN-LAST:event_speedRevLabelMousePressed
+
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPanel actuatorControlsPanel;
@@ -670,20 +793,23 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
     private javax.swing.JButton clawButton;
     private javax.swing.JButton decSpeedButton;
     private javax.swing.JPanel displayPanel;
+    private javax.swing.JPanel gpsDetailsPanel;
     private javax.swing.JPanel gpsDisplayPanel;
     private javax.swing.JLabel headingLabel;
     private javax.swing.JLabel headingValue;
     private javax.swing.JButton incSpeedButton;
-    private javax.swing.JPanel jPanel1;
     private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JPanel mapPanel;
     private static javax.swing.JTextArea messageLog;
     private javax.swing.JPanel movementControlsPanel;
+    private javax.swing.JLabel robot;
     private javax.swing.JPanel sensorControlsPanel;
     private javax.swing.JLabel speed0Label;
     private javax.swing.JLabel speed1Label;
     private javax.swing.JLabel speed2Label;
     private javax.swing.JLabel speed3Label;
     private javax.swing.JPanel speedPanel;
+    private javax.swing.JLabel speedRevLabel;
     private javax.swing.JButton stopButton;
     private javax.swing.JLabel temperatureLabel;
     private javax.swing.JButton thermoButton;

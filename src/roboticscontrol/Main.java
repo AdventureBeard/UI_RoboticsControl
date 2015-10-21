@@ -15,7 +15,6 @@ public class Main {
 	public static void main(String[] args) {
 		
 		final MessageService ms = new MessageService();
-		
 		(new Thread(new UserInterface(ms))).start();
 		(new Thread(new Robot(ms))).start();
 		

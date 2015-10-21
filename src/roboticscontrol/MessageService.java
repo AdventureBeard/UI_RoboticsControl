@@ -35,7 +35,6 @@ public class MessageService {
 	
 	public synchronized void sendToUI(String s) {
 		toUI.add(s);
-		//ystem.out.println("Message added to UI inbox");
 	}
 	
 	public synchronized String receiveFromUI() {

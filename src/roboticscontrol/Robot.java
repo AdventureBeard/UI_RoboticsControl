@@ -7,6 +7,9 @@ package roboticscontrol;
 
 import java.util.Random;
 import java.util.Timer;
+import java.util.TimerTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -14,14 +17,20 @@ import java.util.Timer;
  * @author braden
  */
 public class Robot implements Runnable {
+
+	final int X_LOW_BOUND = 0;
+	final int X_HI_BOUND = 410;
+	final int Y_LOW_BOUND = 0;
+	final int Y_HI_BOUND = 367;
 	
 	// Robot "Operating System" Values
 	private boolean running;
 	MessageService messageService;
 	
 	// "GPS" Sensor Values
-	private int x, y;
-	private int heading;
+	private double x, y;
+	private double dx, dy;
+	private double heading;
 	private int headingDelta;
 	private int speed;
 	
@@ -36,22 +45,32 @@ public class Robot implements Runnable {
 		
 		this.x = 50;
 		this.y = 50;
-		this.heading = 180;
+		this.dx = 0;
+		this.dy = 0;
+		this.heading = 360;
 		this.headingDelta = 0;
 		this.speed = 0;
 		
 		this.clawEngaged = false;
 		this.armAngle = 0;
 		this.armAngleDelta = 0;
-		
 	}
 	
+	@Override
 	public void run() {
 		
+		Timer timer = new Timer();
+		TimerTask task = new TimerTask() {
+			@Override
+			public void run() {
+				calculatePosition();
+			}
+		};
+		timer.scheduleAtFixedRate(task, 0, 50);
+
 		while (running) {
 			String message = messageService.receiveFromUI();
 			if (message != null) {
-				System.out.println("Robot: Received a message: " + message);
 				parseMessage(message);
 			}
 		}
@@ -82,24 +101,35 @@ public class Robot implements Runnable {
 	}
 	
 	private void calculatePosition() {
-		
+		heading += headingDelta * 0.1;
+		dx = Math.sin(heading);
+		dy = Math.cos(heading);
+
+		double newX = x + dx * speed * -1;
+		double newY = y + dy * speed;
+
+		if (newX > X_LOW_BOUND && newX < X_HI_BOUND) {
+			x = newX;
+		} else {
+			speed = 0;
+			sendMessageToUI("bounds:0");
+		}
+
+		if (newY > Y_LOW_BOUND && newY < Y_HI_BOUND ) {
+			y = newY;
+		} else {
+			speed = 0;
+			sendMessageToUI("bounds:0");
+		}
 	}
 
 	private void handshake() {
-		messageService.sendToUI("handshake:0");
-		messageService.sendToUI("updateSpeed:0");
+		sendMessageToUI("handshake:0");
+		sendMessageToUI("updateSpeed:0");
 	}
 			
 	private void end() {
 		this.running = false;
-	}
-
-	private void setX(int x) {
-		this.x = x;
-	}
-
-	private void setY(int y) {
-		this.y = y;
 	}
 
 	private void turn(int delta) {
@@ -107,28 +137,27 @@ public class Robot implements Runnable {
 	}
 
 	private void setSpeed(int speed) {
-		this.speed = speed;
-		messageService.sendToUI("updateSpeed:" + speed);
+		if (speed > 3) {
+			return;
+		} else if (speed < -1) {
+			return;
+		} else if (speed == 0) {
+			this.speed = 0;
+			this.dx = 0;
+			this.dy = 0;
+		} else {
+			this.speed = speed;
+		}
+		sendMessageToUI("updateSpeed:" + speed);
 	}
 
 	private void changeSpeed(int increment) {
-		if (increment > 0 && speed == 3) {
-			messageService.sendToUI("updateSpeed:-1");
-			return;
-		} else if (increment < 0 && speed == 0) {
-			messageService.sendToUI("updateSpeed:-2");
-			return;
-		} else if (increment > 0 && speed < 3) {
-			speed += increment;	
-		} else if (increment < 0 && speed > 0) {
-			speed += increment;
-		}
-		messageService.sendToUI("updateSpeed:" + speed);
+		setSpeed(speed + increment);
 	}
 
 	private void toggleClawEngaged() {
 		clawEngaged = !clawEngaged;
-		messageService.sendToUI("updateClawStatus:" + ((clawEngaged) ? 1 : 0));
+		sendMessageToUI("updateClawStatus:" + ((clawEngaged) ? 1 : 0));
 	}
 
 	private void startCamera() {
@@ -138,12 +167,15 @@ public class Robot implements Runnable {
 	private void readTemperature() {
 		Random random = new Random();
 		int temp = random.nextInt((75 - 65) + 1) + 65;
-		messageService.sendToUI("updateTemp:" + temp);
+		sendMessageToUI("updateTemp:" + temp);
 	}
 	
 	private void sendGPSData() {
+		sendMessageToUI("gps:" + this.x + "-" + this.y);
+	}
 
-		messageService.sendToUI("gps:" + this.x + "-" + this.y + "-" + this.heading);
+	private void sendMessageToUI(String s) {
+		messageService.sendToUI(s);	
 	}
 
 }
