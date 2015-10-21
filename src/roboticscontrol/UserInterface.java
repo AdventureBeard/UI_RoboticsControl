@@ -8,11 +8,15 @@ package roboticscontrol;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.DefaultKeyboardFocusManager;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.KeyEventDispatcher;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
@@ -22,8 +26,11 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.Timer;
 
 /**
@@ -31,17 +38,21 @@ import javax.swing.Timer;
  * @author braden
  */
 public class UserInterface extends javax.swing.JFrame implements Runnable {
-    /**
-     * Creates new form UserInterface
-     */
-	
 	MessageService messageService;
 	private boolean running;
 	BufferedImage image; 
 	
     public UserInterface(MessageService ms) {
 		this.running = true;
+
+		/** Connect to the messageService that bridges communication between the
+		 * robot and the UI.
+		 */
 		this.messageService = ms;
+
+		/**
+		 * Load the robot image.
+		 */
 		try {
 			this.image = ImageIO.read(new File("robot.png"));
 		} catch (IOException ex) {
@@ -50,7 +61,13 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		
 		initComponents();
 
-		mapPanel.setLayout(null);
+		/** NetBeans GUI builder doesn't like us manually placing objects in a layout. 
+		 * Since we are using animations, it will be critical to manually place, so we will
+		 * set the layout for the GPS panel to null.
+		 */
+		mapPanel.setLayout(null); 
+		this.setResizable(false);
+		this.pack();
 		this.setVisible(true);
 		
 		/** Create a key event dispatcher for a custom global hotkey system.
@@ -61,14 +78,13 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 			String[] s = event.paramString().split(",");
 			String eventType = s[0];
 			int keyCode = Integer.parseInt(s[1].substring(s[1].indexOf("=") + 1));
+			// Parsing the parameter string to get the EventType and KeyCode.
 			handleGlobalKeyboardEvent(eventType, keyCode);
 			return true;
 		};
 		
 		DefaultKeyboardFocusManager.getCurrentKeyboardFocusManager().
 				addKeyEventDispatcher(dispatcher);
-		
-
     }
 	
 	@Override
@@ -76,13 +92,23 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		System.out.println("Interface is running.");
 		messageService.sendToRobot("handshake:0");
 		
-		// Setting a separate tick for getting GPS data from the robot.
-		Timer t = new Timer(5, (ActionEvent e) -> {
+		/** GPS TIMER
+		 * 
+		 * Pinging the robot for its GPS information every tick is a waste of resources;
+		 * we set a new timer so that we only ping for a new GPS location every 50 ms.
+		 */
+		Timer t = new Timer(50, (ActionEvent e) -> {
 			messageService.sendToRobot("gps:0");
 		});
 		t.start();
 
-		// This would benefit from more thread synchronization. This whole program is a CPU hog.
+		/** Message Check
+		 * 
+		 * Improvements: Having the thread check for messages constantly is a waste of resources;
+		 * What should happen instead is that the message service notifies the UI when it has 
+		 * a new message. I am leaving going out of town soon so I am short on time, otherwise I would implement
+		 * a better synchronization system.
+		 */
 		while (running) {
 			String message = messageService.receiveFromRobot();
 			if (message != null) {
@@ -91,15 +117,205 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		}
 	}
 	
-	/** handleGlobalKeyboardEvent
-	 * 
+
+
+	/** parseMessage
+	 * 	Method for converting a message from the robot into some action to modify
+	 *  the UI state.
+	 * @param m  a String containing an instruction in the format 'command:parameter'
+	 */
+	private void parseMessage(String m) {
+		String[] message = m.split(":");
+		String command = message[0];
+		String parameter = message[1];
+		switch(command) {
+			case "handshake":			updateLog("HANDSHAKE SUCCESS: CONNECTION TO ROBOT ESTABLISHED");
+										break;
+			case "updateTemp":			updateTemp(parameter);
+										break;
+			case "updateSpeed":			updateSpeed(parameter);
+										break;
+			case "updateClawStatus":	updateClawStatus(parameter);
+										break;
+			case "updateCameraStatus":	updateCameraStatus(parameter);
+										break;
+			case "gps":					updateGPS(parameter);
+										break;
+			case "bounds":				updateLog("Robot reached bounds of operation area.");
+										break;
+			default:					break;
+		}
+	}
+	
+	
+	/** updateLog
+	 * Report messages from robot to the interface.
+	 * @param s 	a String to be appended to the messageLog text area.
+	 */
+	private void updateLog(String s) {
+		Date date = new Date();
+		messageLog.append(date + ": " + s + "\n");
+		messageLog.setCaretPosition(messageLog.getText().length());
+	}
+
+	/** updateGPS
+	 * Accepts a String expecting GPS information in the format:
+	 *  XCoordinate#YCoordinate#HeadingAngleInDegrees.
+	 * 	Moves robot label element to the new X and Y positions, calculates a heading
+	 * 	in degrees between 0 and 360, and then sends angle information to the rotateImage
+	 * 	function to get new rotation transformation for the robot image.
+	 * @param p 
+	 */
+	private void updateGPS(String reportedPosition) {
+		String[] args = reportedPosition.split("#");
+		double x = Double.parseDouble(args[0]);
+		double y = Double.parseDouble(args[1]);
+		double h = Double.parseDouble(args[2]);
+
+		int posX = (int) Math.round(x);		// Round and convert to integers for UI display purposes.
+		int posY = (int) Math.round(y);
+		int heading = (int) Math.round(h);
+
+		heading = -1 * (heading - 360) % 360; // Map the heading between 0 and 360.
+
+		xCoordinateValue.setText(String.valueOf(posX)); // Update the UI.
+		yCoordinateValue.setText(String.valueOf(posY));
+		headingValue.setText(String.valueOf(heading) + "°");
+
+		BufferedImage rotated = rotateImage(image, Math.toRadians(heading)); // Rotate the image using heading.
+		ImageIcon ic = new ImageIcon(rotated);
+		robot.setIcon(ic);
+		robot.setLocation(posX, posY);
+	}
+
+	/** updateTemp
+	 * Updates the UI with the robot's last reported temperature reading.
+	 * @param t 	The robot's last reported temperature.
+	 */
+	
+	private void updateTemp(String t) {
+		temperatureLabel.setText(t + " °F");
+		updateLog("Received new temperature reading from robot: " + t + " °F" );
+	}
+	
+	/** updateSpeed
+	 * Updates the UI according to the speed reported by the robot. 
+	 * Sets all speed buttons to the default background, and then highlights in
+	 * red the speed button that corresponds to the robots new current speed.
+	 * @param speed 	The robot's last reported speed.
+	 */
+	private void updateSpeed(String speed) {
+		int s = Integer.parseInt(speed);
+		speed1Label.setBackground(new Color(238,238,238));
+		speed2Label.setBackground(new Color(238,238,238));
+		speed3Label.setBackground(new Color(238,238,238));
+		speed0Label.setBackground(new Color(238,238,238));
+		speedRevLabel.setBackground(new Color(238,238,238));
+
+		if (s == 1) {
+			speed1Label.setBackground(Color.red);
+		} else if (s == 2) {
+			speed2Label.setBackground(Color.red);
+		} else if (s == 3) {
+			speed3Label.setBackground(Color.red);
+		} else if (s == -1) {
+			speedRevLabel.setBackground(Color.red);
+		} else if (s == 0) {
+			speed0Label.setBackground(Color.red);
+		}
+		updateLog("Robot set speed to " + s );
+	}
+
+
+	/** updateClawStatus
+	 * Updates the claw icon according to the status of the claw.
+	 * @param status A string containing the clawOn or clawOff parameter represented
+	 * as a 1 or a 0.
+	 */
+	private void updateClawStatus(String status) {
+		int s = Integer.parseInt(status);
+		if (s == 1) {
+			clawButton.setIcon(new ImageIcon("Claw-Closed.png"));
+			updateLog("Robot set claw to engaged");
+		} else {
+			clawButton.setIcon(new ImageIcon("Claw-Open.png"));
+			updateLog("Robot set claw to disengaged");
+		}
+	}
+
+	private void updateCameraStatus(String status) {
+		int s = Integer.parseInt(status);
+		if (s == 1) {
+			activateCameraDisplay();
+			updateLog("Camera activated");
+		} else {
+			updateLog("Camera deactivated");
+		}	
+	}
+
+	private void activateCameraDisplay() {
+		JFrame f = new JFrame(); //creates jframe f
+
+		/** Add listener for window close.
+		 * Add a listener for closing the window so we can deactivate the camera.
+		 */
+		f.addWindowListener(new WindowAdapter() 
+        {
+            @Override
+            public void windowClosing(WindowEvent e)
+            {
+				messageService.sendToRobot("camera:0");
+                e.getWindow().dispose();
+            }
+        });
+	
+    	Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize(); //this is your screen size
+
+		BufferedImage bi;
+		ImageIcon img = new ImageIcon();
+		try {
+			bi = ImageIO.read(new File("terrain.jpg"));
+			img = new ImageIcon(bi);
+		} catch (IOException ex) {
+			Logger.getLogger(UserInterface.class.getName()).log(Level.SEVERE, null, ex);
+		}
+
+    	JLabel lbl = new JLabel((Icon) img); 
+    	f.getContentPane().add(lbl); 
+    	f.setSize(img.getIconWidth(), img.getIconHeight()); 
+    	int x = (screenSize.width - f.getSize().width)/2; 
+    	int y = (screenSize.height - f.getSize().height)/2;
+    	f.setLocation(x, y); 
+    	f.setVisible(true); 
+	}
+
+	/** setAngle
+	 * Accepts a buffered image and an angle in radians and returns a new image
+	 * set to that rotation.
+	 * @param image		A BufferdImage to be rotated.
+	 * @param angle		An angle in radians to rotate to.
+	 * @return 			A rotated BufferedImage
+	 */
+	private BufferedImage rotateImage(BufferedImage image, double angle) {
+		int locX = image.getWidth() / 2;
+		int locY = image.getHeight() / 2;
+		
+		AffineTransform transform = new AffineTransform();
+
+		transform.setToRotation(-angle + Math.PI/2, locX, locY); // A little bit of hacky math to get the rotation right.
+   		AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
+        	
+		image = op.filter(image, null);
+		return image;
+	}
+	
+		/** handleGlobalKeyboardEvent
 	 * 	Event handler for global keyboard shortcuts for robot functions.
 	 * 
 	 * @param eventType 	The type of event, such as "KEY_PRESSED" or "KEY_RELEASED"
 	 * @param keyCode 		The code of the pressed key
 	 */
 	private void handleGlobalKeyboardEvent(String eventType, int keyCode) {
-		System.out.println(keyCode);
 		
 		if ("KEY_PRESSED".equals(eventType) && keyCode == 65) {
 			messageService.sendToRobot("turn:-1");
@@ -137,123 +353,6 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 			stopButton.doClick();
 		}
 	} 
-	
-
-	/** parseMessage
-	 *	
-	 * 	Method for converting a message from the robot into some action to modify
-	 *  the UI state.
-	 * 
-	 * @param m  a String containing an instruction in the format 'command:parameter'
-	 */
-	private void parseMessage(String m) {
-		String[] message = m.split(":");
-		String command = message[0];
-		String parameter = message[1];
-		switch(command) {
-			case "handshake":			updateLog("HANDSHAKE SUCCESS: CONNECTION TO ROBOT ESTABLISHED");
-										break;
-			case "updateTemp":			updateTemp(parameter);
-										break;
-			case "updateSpeed":			updateSpeed(parameter);
-										break;
-			case "updateClawStatus":	updateClawStatus(parameter);
-										break;
-			case "gps":					updateGPS(parameter);
-										break;
-			case "bounds":				updateLog("Robot reached bounds of operation area.");
-										break;
-			default:					break;
-		}
-	}
-	
-	
-	/** updateLog
-	 * 
-	 * Report messages from robot to the interface.
-	 * 
-	 * @param s 	a String to be appended to the messageLog text area.
-	 */
-	private void updateLog(String s) {
-		Date date = new Date();
-		messageLog.append(date + ": " + s + "\n");
-		messageLog.setCaretPosition(messageLog.getText().length());
-	}
-	
-	private void updateGPS(String p) {
-		String[] args = p.split("-");
-		double x = Double.parseDouble(args[0]);
-		double y = Double.parseDouble(args[1]);
-
-		double heading = Math.atan(y/x);
-		heading = heading * (180 / Math.PI);
-
-		int posX = (int) Math.round(x);
-		int posY = (int) Math.round(y);
-		int displayHeading = (int) Math.round(heading);
-
-		xCoordinateValue.setText(String.valueOf(posX));
-		yCoordinateValue.setText(String.valueOf(posY));
-		headingValue.setText(String.valueOf(displayHeading));
-
-		BufferedImage rotated = setAngle(image, heading);
-		ImageIcon ic = new ImageIcon(rotated);
-		robot.setIcon(ic);
-		robot.setLocation(posX, posY);
-	}
-	
-	private void updateTemp(String t) {
-		temperatureLabel.setText(t + " °F");
-		updateLog("Received new temperature reading from robot: " + t + " °F" );
-	}
-	
-	private void updateSpeed(String speed) {
-		int s = Integer.parseInt(speed);
-		speed1Label.setBackground(new Color(238,238,238));
-		speed2Label.setBackground(new Color(238,238,238));
-		speed3Label.setBackground(new Color(238,238,238));
-		speed0Label.setBackground(new Color(238,238,238));
-		speedRevLabel.setBackground(new Color(238,238,238));
-
-		if (s == 1) {
-			speed1Label.setBackground(Color.red);
-		} else if (s == 2) {
-			speed2Label.setBackground(Color.red);
-		} else if (s == 3) {
-			speed3Label.setBackground(Color.red);
-		} else if (s == -1) {
-			speedRevLabel.setBackground(Color.red);
-		} else if (s == 0) {
-			speed0Label.setBackground(Color.red);
-		}
-		updateLog("Robot set speed to " + s );
-	}
-	
-	private void updateClawStatus(String status) {
-		int s = Integer.parseInt(status);
-		if (s == 1) {
-			clawButton.setIcon(new ImageIcon("Claw-Closed.png"));
-			updateLog("Robot set claw to engaged");
-		} else {
-			clawButton.setIcon(new ImageIcon("Claw-Open.png"));
-			updateLog("Robot set claw to disengaged");
-		}
-	}
-
-	private BufferedImage setAngle(BufferedImage image, double angle) {
-		int locX = image.getWidth() / 2;
-		int locY = image.getHeight() / 2;
-		
-		AffineTransform transform = new AffineTransform();
-
-		transform.translate(locX, locY);
-		transform.rotate(angle);
-		transform.translate(-locX, -locY/2);
-   		AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BILINEAR);
-        	
-		image = op.filter(image, null);
-		return image;
-	}
 	
 
     /**
@@ -374,11 +473,16 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
         });
 
         stopButton.setBackground(new java.awt.Color(255, 102, 102));
-        stopButton.setFont(new java.awt.Font("Lucida Grande", 0, 36)); // NOI18N
-        stopButton.setText("STOP");
+        stopButton.setFont(new java.awt.Font("Lucida Grande", 0, 24)); // NOI18N
+        stopButton.setText("Stop (X)");
         stopButton.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 stopButtonMousePressed(evt);
+            }
+        });
+        stopButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                stopButtonActionPerformed(evt);
             }
         });
 
@@ -497,11 +601,10 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
                         .addGap(6, 6, 6)
                         .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
                             .addComponent(incSpeedButton, javax.swing.GroupLayout.PREFERRED_SIZE, 149, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addGroup(movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                .addComponent(stopButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(decSpeedButton, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 143, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addComponent(stopButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(decSpeedButton, javax.swing.GroupLayout.PREFERRED_SIZE, 143, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(speedPanel, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
-                .addContainerGap(17, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         movementControlsPanelLayout.setVerticalGroup(
             movementControlsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -581,12 +684,12 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, mapPanelLayout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(robot)
-                .addGap(75, 75, 75))
+                .addGap(195, 195, 195))
         );
         mapPanelLayout.setVerticalGroup(
             mapPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(mapPanelLayout.createSequentialGroup()
-                .addGap(85, 85, 85)
+                .addGap(174, 174, 174)
                 .addComponent(robot)
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -784,6 +887,10 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
     private void speedRevLabelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_speedRevLabelMousePressed
         messageService.sendToRobot("speed2:-1");
     }//GEN-LAST:event_speedRevLabelMousePressed
+
+    private void stopButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stopButtonActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_stopButtonActionPerformed
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables

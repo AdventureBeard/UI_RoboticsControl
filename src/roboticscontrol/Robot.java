@@ -8,8 +8,6 @@ package roboticscontrol;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 
 /**
@@ -18,10 +16,11 @@ import java.util.logging.Logger;
  */
 public class Robot implements Runnable {
 
+	// Boundaries of the "map"
 	final int X_LOW_BOUND = 0;
 	final int X_HI_BOUND = 410;
 	final int Y_LOW_BOUND = 0;
-	final int Y_HI_BOUND = 367;
+	final int Y_HI_BOUND = 368;
 	
 	// Robot "Operating System" Values
 	private boolean running;
@@ -34,31 +33,45 @@ public class Robot implements Runnable {
 	private int headingDelta;
 	private int speed;
 	
+	// Camera Sensor Values
+	private boolean cameraActive;
+
 	// Actuator Arm Values
 	private int armAngle;
 	private int armAngleDelta;
 	private boolean clawEngaged;
 
+
 	public Robot(MessageService ms) {
 		this.messageService = ms;
 		this.running = true;
 		
-		this.x = 50;
-		this.y = 50;
+		// DEFAULT VALUES //
+		this.x = 205;
+		this.y = 184;
 		this.dx = 0;
 		this.dy = 0;
-		this.heading = 360;
+		this.heading = 3 * Math.PI/2;
 		this.headingDelta = 0;
 		this.speed = 0;
-		
 		this.clawEngaged = false;
 		this.armAngle = 0;
 		this.armAngleDelta = 0;
+		this.cameraActive = false;
+		/////////////////////
 	}
+
 	
 	@Override
 	public void run() {
 		
+		/** GPS Calculation Timer.
+		 * I didn't want to calculate the GPS position every tick, so this timer
+		 * calls the GPS recalculation every 50ms. This uses a different timer
+		 * than the UI. Ultimately I could've used either, but since the UI uses 
+		 * Swing I figured using the Swing timer for that one and the Thread timer
+		 * for this one made more sense.
+		 */	
 		Timer timer = new Timer();
 		TimerTask task = new TimerTask() {
 			@Override
@@ -67,7 +80,14 @@ public class Robot implements Runnable {
 			}
 		};
 		timer.scheduleAtFixedRate(task, 0, 50);
-
+		
+		/** Message Check
+		 * 
+		 * Improvements: Having the thread check for messages constantly is a waste of resources;
+		 * What should happen instead is that the message service notifies the UI when it has 
+		 * a new message. I am leaving going out of town soon so I am short on time, otherwise I would implement
+		 * a better synchronization system.
+		 */
 		while (running) {
 			String message = messageService.receiveFromUI();
 			if (message != null) {
@@ -76,6 +96,11 @@ public class Robot implements Runnable {
 		}
 	}
 	
+	 /** parseMessage
+	 * 	Method for converting a message from the UI into some action to modify
+	 *  the robot state.
+	 * @param m  a String containing an instruction in the format 'command:parameter'
+	 */
 	private void parseMessage(String m) {
 		String[] message = m.split(":");
 		String command = message[0];
@@ -97,15 +122,23 @@ public class Robot implements Runnable {
 								break;
 			case "speed2":		setSpeed(parameter);
 								break;
+			case "camera":		toggleCamera();
+								break;
 		}
 	}
-	
+
+	/** calculatePosition
+	 * 	Using the current X, Y, heading, and speed values , calculate the robot's
+	 *  new GPS coordinates. If the new X and Y positions are outside the operation area,
+	 * 	set speed to 0 and report to the UI. Remember that Math.sin and Math.cos use radians.
+	 */
 	private void calculatePosition() {
 		heading += headingDelta * 0.1;
-		dx = Math.sin(heading);
-		dy = Math.cos(heading);
+		heading = heading % 6.28;
+		dx = Math.cos(heading);
+		dy = Math.sin(heading);
 
-		double newX = x + dx * speed * -1;
+		double newX = x + dx * speed;
 		double newY = y + dy * speed;
 
 		if (newX > X_LOW_BOUND && newX < X_HI_BOUND) {
@@ -123,19 +156,33 @@ public class Robot implements Runnable {
 		}
 	}
 
+	/** handShake
+	 * Function to confirm connection between UI and robot.
+	 */
 	private void handshake() {
 		sendMessageToUI("handshake:0");
 		sendMessageToUI("updateSpeed:0");
 	}
 			
+	/** end
+	 * Used to turn off robot. Not used.
+	 */
 	private void end() {
 		this.running = false;
 	}
-
+	
+	/** turn
+	 * Respond to a turn event message from the UI.
+	 * @param delta 	A new delta value for the heading.
+	 */
 	private void turn(int delta) {
 		headingDelta = delta;
 	}
 
+	/** setSpeed
+	 * Set the new speed of the robot, paying mind to the max and minimum speeds.
+	 * @param speed 	the new speed of the robot.
+	 */ 
 	private void setSpeed(int speed) {
 		if (speed > 3) {
 			return;
@@ -150,30 +197,54 @@ public class Robot implements Runnable {
 		}
 		sendMessageToUI("updateSpeed:" + speed);
 	}
-
+	/** changeSpeed
+	 *	Increment the speed by a value parameter sent by the UI. 
+	 * @param increment 	the increment to be added to the speed.
+	 */
 	private void changeSpeed(int increment) {
 		setSpeed(speed + increment);
 	}
 
+	/** toggleClawEngaged()
+	 * Respond to a UI event message to toggle claw status.
+	 */
 	private void toggleClawEngaged() {
 		clawEngaged = !clawEngaged;
 		sendMessageToUI("updateClawStatus:" + ((clawEngaged) ? 1 : 0));
 	}
-
-	private void startCamera() {
-		
+	
+	/** startCamera
+	 * Respond to toggle camera event from the UI.
+	 */
+	private void toggleCamera() {
+		cameraActive = !cameraActive;
+		sendMessageToUI("updateCameraStatus:" + ((cameraActive) ? 1 : 0));
 	}
 
+	/** readTemperature
+	 * Respond to read temperature event from the UI. Just generates a random
+	 * temperature near room temperature.
+	 */
 	private void readTemperature() {
 		Random random = new Random();
 		int temp = random.nextInt((75 - 65) + 1) + 65;
 		sendMessageToUI("updateTemp:" + temp);
 	}
 	
+	/** sendGPSData
+	 * Send all GPS data to the UI. Converts heading to degrees before sending.
+	 */
 	private void sendGPSData() {
-		sendMessageToUI("gps:" + this.x + "-" + this.y);
+		System.out.println("gps:" + this.x + "#" + this.y + "#" + Math.toDegrees(this.heading));
+		sendMessageToUI("gps:" + this.x + "#" + this.y + "#" + Math.floor(Math.toDegrees(this.heading)));
 	}
 
+	/** sendMessageToUI
+	 * Unified send message function. Originally used for thread synchronization, but
+	 * I ran out of time before going out of town so I didn't end up making good multithreading
+	 * a priority since this was mainly a UI project.
+	 * @param s 	the message to send
+	 */
 	private void sendMessageToUI(String s) {
 		messageService.sendToUI(s);	
 	}
