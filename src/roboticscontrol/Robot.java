@@ -77,6 +77,7 @@ public class Robot implements Runnable {
 			@Override
 			public void run() {
 				calculatePosition();
+				calculateArmAngle();
 			}
 		};
 		timer.scheduleAtFixedRate(task, 0, 50);
@@ -108,7 +109,7 @@ public class Robot implements Runnable {
 		switch (command) {
 			case "handshake" :	handshake();
 								break;
-			case "gps":			sendGPSData();
+			case "status":		sendStatusData();
 								break;
 			case "end" :		end();
 								break;
@@ -118,6 +119,8 @@ public class Robot implements Runnable {
 								break;
 			case "claw" :		toggleClawEngaged();
 								break;
+			case "arm"	:		changeArmAngle(parameter);
+								break;
 			case "speed":		changeSpeed(parameter);
 								break;
 			case "speed2":		setSpeed(parameter);
@@ -125,6 +128,15 @@ public class Robot implements Runnable {
 			case "camera":		toggleCamera();
 								break;
 		}
+	}
+
+	/** handShake
+	 * Function to confirm connection between UI and robot.
+	 */
+	private void handshake() {
+		sendMessageToUI("handshake:0");
+		sendMessageToUI("updateSpeed:0");
+		sendMessageToUI("updateArmAngle:" + armAngle);
 	}
 
 	/** calculatePosition
@@ -155,13 +167,16 @@ public class Robot implements Runnable {
 			sendMessageToUI("bounds:0");
 		}
 	}
-
-	/** handShake
-	 * Function to confirm connection between UI and robot.
+	
+	/** calculateArmAngle
+	 * Use the current arm delta value to calculate a new arm angle. Ensure it is
+	 * between 0 and 90 inclusive.
 	 */
-	private void handshake() {
-		sendMessageToUI("handshake:0");
-		sendMessageToUI("updateSpeed:0");
+	private void calculateArmAngle() {
+		int newAngle = armAngle + armAngleDelta;
+		if (newAngle <= 90 && newAngle >= 0) {
+			armAngle = newAngle;
+		}
 	}
 			
 	/** end
@@ -212,6 +227,10 @@ public class Robot implements Runnable {
 		clawEngaged = !clawEngaged;
 		sendMessageToUI("updateClawStatus:" + ((clawEngaged) ? 1 : 0));
 	}
+
+	private void changeArmAngle(int parameter) {
+		armAngleDelta = parameter;
+	}
 	
 	/** startCamera
 	 * Respond to toggle camera event from the UI.
@@ -234,9 +253,9 @@ public class Robot implements Runnable {
 	/** sendGPSData
 	 * Send all GPS data to the UI. Converts heading to degrees before sending.
 	 */
-	private void sendGPSData() {
-		System.out.println("gps:" + this.x + "#" + this.y + "#" + Math.toDegrees(this.heading));
-		sendMessageToUI("gps:" + this.x + "#" + this.y + "#" + Math.floor(Math.toDegrees(this.heading)));
+	private void sendStatusData() {
+		sendMessageToUI("updateGPS:" + this.x + "#" + this.y + "#" + Math.floor(Math.toDegrees(this.heading)));
+		sendMessageToUI("updateArmAngle:" + armAngle);
 	}
 
 	/** sendMessageToUI
