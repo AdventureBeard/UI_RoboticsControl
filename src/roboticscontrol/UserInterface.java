@@ -185,8 +185,8 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
 		/** I haven't worked a ton with graphics in java. After research , I now 
 		 *  know a better way to do this would've been to create a subclass of JPanel 
-		 * 	and do my animations with Graphics2D objects. Unfortunately I don't have the
-		 *  time to refactor, but I did use that better method for the arm angle.
+		 *  and do my animations with Graphics2D objects. Unfortunately I don't have the
+		 *  time to refactor, but I did use the superior method for the arm angle.
 		 */
 		
 		BufferedImage rotated = rotateImage(robotImage, Math.toRadians(heading),
@@ -284,24 +284,22 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	 *  Creates a new window, loads a image file into memory, and displays that image
 	 * 	in the window.
 	 */
-
 	private void activateCameraDisplay() {
 		JFrame f = new JFrame(); //creates jframe f
 
 		/** Add listener for window close.
 		 * Add a listener for closing the window so we can deactivate the camera.
 		 */
-		f.addWindowListener(new WindowAdapter() 
-        {
-            @Override
-            public void windowClosing(WindowEvent e)
-            {
+		f.addWindowListener(new WindowAdapter() {
+            		@Override
+            		public void windowClosing(WindowEvent e) {
 				// Make sure the robot deactivates its camera if the image window is closed.
 				messageService.sendToRobot("camera:0");
-                e.getWindow().dispose();
-            }
-        });
-    	Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize(); //this is your screen size
+                		e.getWindow().dispose();
+            		}
+		 });
+    		
+    		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize(); //this is your screen size
 		BufferedImage bi;
 		ImageIcon img = new ImageIcon();
 		try {
@@ -310,14 +308,13 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		} catch (IOException ex) {
 			Logger.getLogger(UserInterface.class.getName()).log(Level.SEVERE, null, ex);
 		}
-
-    	JLabel lbl = new JLabel((Icon) img); 
-    	f.getContentPane().add(lbl); 
-    	f.setSize(img.getIconWidth(), img.getIconHeight()); 
-    	int x = (screenSize.width - f.getSize().width)/2; 
-    	int y = (screenSize.height - f.getSize().height)/2;
-    	f.setLocation(x, y); 
-    	f.setVisible(true); 
+    		JLabel lbl = new JLabel((Icon) img); 
+    		f.getContentPane().add(lbl); 
+    		f.setSize(img.getIconWidth(), img.getIconHeight()); 
+    		int x = (screenSize.width - f.getSize().width)/2; 
+    		int y = (screenSize.height - f.getSize().height)/2;
+    		f.setLocation(x, y); 
+    		f.setVisible(true); 
 	}
 
 	/** rotateImage
@@ -328,9 +325,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	 * @return 			A rotated BufferedImage
 	 */
 	private BufferedImage rotateImage(BufferedImage image, double angle, int centerX, int centerY) {
-		
 		AffineTransform transform = new AffineTransform();
-
 		transform.setToRotation(-angle + Math.PI/2, centerX, centerY); // A little bit of hacky math to get the rotation right.
    		AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
         	
