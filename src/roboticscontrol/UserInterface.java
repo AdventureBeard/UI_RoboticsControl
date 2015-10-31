@@ -119,7 +119,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	}
 	
 	/** parseMessage
-	 * 	Method for converting a message from the robot into some action to modify
+	 *  Method for converting a message from the robot into some action to modify
 	 *  the UI state.
 	 * @param m  a String containing an instruction in the format 'command:parameter'
 	 */
@@ -147,7 +147,6 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 			default:					break;
 		}
 	}
-	
 	
 	/** updateLog
 	 * Report messages from robot to the interface.
@@ -255,7 +254,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	/** updateArmAngle
 	 * Sets the displayed arm angle to the given angle and sets the rotation of the 
 	 * rectangle in the ArmAnglePanel object.
-	 * @param status  The angle of the arm, a value between 0 and 90.
+	 * @param status  	The angle of the arm, a value between 0 and 90.
 	 */
 	private void updateArmAngle(String status) {
 		int angle = Integer.parseInt(status);
@@ -268,7 +267,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	/** updateCameraStatus
 	 * Update the state of the camera, print the new state to the log, and 
 	 * call the camera display window function if necessary.
-	 * @param status  The status of the camera, expected to be "0" or "1".
+	 * @param status  	The status of the camera, expected to be "0" or "1".
 	 */
 	private void updateCameraStatus(String status) {
 		int s = Integer.parseInt(status);
@@ -282,7 +281,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 
 	/** activateCameraDisplay
 	 *  Creates a new window, loads a image file into memory, and displays that image
-	 * 	in the window.
+	 *  in the window.
 	 */
 	private void activateCameraDisplay() {
 		JFrame f = new JFrame(); //creates jframe f
@@ -322,7 +321,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	 * set to that rotation.
 	 * @param image		A BufferdImage to be rotated.
 	 * @param angle		An angle in radians to rotate to.
-	 * @return 			A rotated BufferedImage
+	 * @return 		A rotated BufferedImage
 	 */
 	private BufferedImage rotateImage(BufferedImage image, double angle, int centerX, int centerY) {
 		AffineTransform transform = new AffineTransform();
