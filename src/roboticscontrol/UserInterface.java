@@ -40,7 +40,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 	BufferedImage robotImage; 
 	
 	
-    public UserInterface(MessageService ms) {
+	public UserInterface(MessageService ms) {
 
 		currentDirectory = System.getProperty("user.dir");
 		System.out.println(currentDirectory);
@@ -86,7 +86,7 @@ public class UserInterface extends javax.swing.JFrame implements Runnable {
 		
 		DefaultKeyboardFocusManager.getCurrentKeyboardFocusManager().
 				addKeyEventDispatcher(dispatcher);
-    }
+	}
 	
 	@Override
 	public void run() {
